@@ -4,6 +4,8 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     FIRMWARE_EXECUTION_MODE=demo \
     WOKWI_CLI_PATH=wokwi-cli \
+    WOKWI_CLI_INSTALL=/usr/local \
+    PATH="/root/.wokwi/bin:/usr/local/bin:${PATH}" \
     APP_HOST=0.0.0.0 \
     APP_PORT=8000
 
@@ -18,11 +20,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     make \
     && rm -rf /var/lib/apt/lists/*
 
-# Install official Wokwi CLI for Linux
-RUN curl -L https://wokwi.com/ci/install.sh | sh
+# Install official Wokwi CLI for Linux and ensure it is available in system PATH
+RUN curl -L https://wokwi.com/ci/install.sh | sh \
+    && (cp -f /root/.wokwi/bin/wokwi-cli /usr/local/bin/ 2>/dev/null || true) \
+    && chmod +x /usr/local/bin/wokwi-cli 2>/dev/null || true
 
 # Verify Wokwi CLI installation
-RUN wokwi-cli --version
+RUN which wokwi-cli && wokwi-cli --version
 
 # Install Python dependencies
 COPY requirements.txt .
