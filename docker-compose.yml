@@ -1,0 +1,19 @@
+services:
+  firmware-tester:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: firmware-tester-app
+    ports:
+      - "8000:8000"
+    environment:
+      - FIRMWARE_EXECUTION_MODE=demo
+      - WOKWI_CLI_TOKEN=${WOKWI_CLI_TOKEN}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.1-flash-lite}
+      - WOKWI_CLI_PATH=wokwi-cli
+      - APP_HOST=0.0.0.0
+      - APP_PORT=8000
+    env_file:
+      - .env
+    restart: unless-stopped

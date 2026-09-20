@@ -71,22 +71,22 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     def get_wokwi_executable(self) -> str:
         """Resolve absolute path to wokwi-cli executable."""
-        # 1. Direct path relative to PROJECT_ROOT
-        direct_path = (self.PROJECT_ROOT / self.WOKWI_CLI_PATH).resolve()
-        if direct_path.exists() and direct_path.is_file():
-            return str(direct_path)
-
-        # 2. Local in PROJECT_ROOT
-        local_wokwi = self.PROJECT_ROOT / "wokwi-cli.exe"
-        if local_wokwi.exists() and local_wokwi.is_file():
-            return str(local_wokwi)
-
-        # 3. System PATH
+        # 1. System PATH or binary name (standard in Docker / Linux environments)
         found = shutil.which(self.WOKWI_CLI_PATH) or shutil.which("wokwi-cli") or shutil.which("wokwi-cli.exe")
         if found:
             return found
 
-        return str(local_wokwi)
+        # 2. Direct path relative to PROJECT_ROOT
+        direct_path = (self.PROJECT_ROOT / self.WOKWI_CLI_PATH).resolve()
+        if direct_path.exists() and direct_path.is_file():
+            return str(direct_path)
+
+        # 3. Local in PROJECT_ROOT
+        local_wokwi = self.PROJECT_ROOT / "wokwi-cli.exe"
+        if local_wokwi.exists() and local_wokwi.is_file():
+            return str(local_wokwi)
+
+        return self.WOKWI_CLI_PATH
 
     def is_wokwi_installed(self) -> bool:
         """Check if wokwi-cli is installed and responds to --version."""
