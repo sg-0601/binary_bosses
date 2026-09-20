@@ -1,0 +1,47 @@
+# Environment variables & secrets (CRITICAL - NEVER COMMIT)
+.env
+*.env
+!.env.example
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Test execution outputs & logs
+test_results/
+*.log
+scratch/
+
+# Build artifacts & binary outputs
+build/
+*.bin
+*.elf
+*.hex
+*.exe
+*.o
+*.a
+*.map
+
+# Whitelist precompiled demo artifacts needed for DEMO_MODE simulation
+!wokwi/projects/fan_controller/fan_controller.ino.bin
+!wokwi/projects/fan_controller/fan_controller.ino.elf
+!firmware/precompiled/esp32/hello_world.bin
+!firmware/precompiled/esp32/hello_world.elf
+!firmware/precompiled/esp32/bootloader.bin
+!firmware/precompiled/esp32/partition-table.bin
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE configurations
+.vscode/
+.idea/

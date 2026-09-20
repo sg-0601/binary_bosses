@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "author": "Firmware Testing Agent",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-esp32-devkit-v1",
+      "id": "esp",
+      "top": 0,
+      "left": 0,
+      "attrs": {
+        "fullBoot": "1"
+      }
+    },
+    {
+      "type": "wokwi-dht22",
+      "id": "dht",
+      "top": -100,
+      "left": -60,
+      "attrs": {
+        "temperature": "32"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "fan_led",
+      "top": -100,
+      "left": 80,
+      "attrs": {
+        "color": "green",
+        "label": "FAN_RELAY"
+      }
+    }
+  ],
+  "connections": [
+    [ "esp:TX0", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX0", "$serialMonitor:TX", "", [] ],
+    [ "esp:D4", "dht:SDA", "green", [] ],
+    [ "esp:3V3", "dht:VCC", "red", [] ],
+    [ "esp:GND.1", "dht:GND", "black", [] ],
+    [ "esp:D13", "fan_led:A", "blue", [] ],
+    [ "esp:GND.2", "fan_led:C", "black", [] ]
+  ],
+  "serialMonitor": {
+    "display": "terminal"
+  },
+  "dependencies": {}
+}

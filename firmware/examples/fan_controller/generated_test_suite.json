@@ -1,0 +1,886 @@
+{
+  "firmware_name": "fan_controller",
+  "target_hardware": "esp32-devkit-c",
+  "test_cases": [
+    {
+      "id": "TC_NORM_001",
+      "name": "System Boot and Hardware Initialization",
+      "category": "NORMAL",
+      "description": "Verify target microcontroller boots cleanly, initializes peripherals, and settles into initial state.",
+      "priority": "CRITICAL",
+      "preconditions": [
+        "Target hardware powered on or reset asserted"
+      ],
+      "inputs": {
+        "power": "ON",
+        "reset_pin": "HIGH"
+      },
+      "actions": [
+        "Apply nominal operating voltage to board",
+        "Release hardware reset line",
+        "Observe boot diagnostics and startup log"
+      ],
+      "expected_outputs": {
+        "FAN_PIN": "LOW",
+        "STATUS_LED_PIN": "LOW"
+      },
+      "expected_behavior": "Firmware transitions to initial state 'SYSTEM_INIT' with default peripheral outputs asserted and boot announcement logged.",
+      "failure_conditions": [
+        "Microcontroller enters infinite loop or watchdog crash",
+        "Initial outputs do not match default safe state",
+        "Boot announcement missing from serial monitor"
+      ],
+      "hardware_requirements": {
+        "board": "esp32-devkit-c",
+        "mcu": "ESP32",
+        "architecture": "Xtensa LX6",
+        "required_pins": [
+          "A0",
+          "13",
+          "12"
+        ]
+      },
+      "expected_serial_log": "[SYSTEM_BOOT] Industrial Firmware v1.0.0 initializing...",
+      "metadata": {
+        "test_type": "boot_initialization"
+      }
+    },
+    {
+      "id": "TC_NORM_002",
+      "name": "Nominal Normal Operation: temperature at 25.0 Celsius",
+      "category": "NORMAL",
+      "description": "Validate firmware steady-state behavior under nominal temperature (25.0 Celsius).",
+      "priority": "HIGH",
+      "preconditions": [
+        "System booted successfully in normal operating state"
+      ],
+      "inputs": {
+        "temperature": 25.0,
+        "unit": "Celsius"
+      },
+      "actions": [
+        "Inject steady nominal temperature reading of 25.0 Celsius",
+        "Allow sensor sampling cycle to execute",
+        "Verify actuator states and output telemetry"
+      ],
+      "expected_outputs": {
+        "FAN_PIN": "LOW",
+        "STATUS_LED_PIN": "LOW"
+      },
+      "expected_behavior": "Firmware remains in normal operating state with temperature within nominal limits. Outputs remain in inactive/cooling standby.",
+      "failure_conditions": [
+        "System triggers false positive alarm or unexpected actuation",
+        "Firmware fails to sample or parse sensor input"
+      ],
+      "hardware_requirements": {
+        "board": "esp32-devkit-c",
+        "mcu": "ESP32",
+        "architecture": "Xtensa LX6",
+        "required_pins": [
+          "A0",
+          "13",
+          "12"
+        ]
+      },
+      "expected_serial_log": "Normal Range",
+      "metadata": {
+        "sensor": "Industrial Temperature Sensor",
+        "nominal_value": 25.0
+      }
+    },
+    {
+      "id": "TC_BOUND_001",
+      "name": "Threshold Boundary Below: temperature at 29.0 Celsius",
+      "category": "BOUNDARY",
+      "description": "Verify system behavior immediately below decision threshold (30.0 Celsius).",
+      "priority": "HIGH",
+      "preconditions": [
+        "System operational in normal monitoring state"
+      ],
+      "inputs": {
+        "temperature": 29.0,
+        "threshold": 30.0,
+        "unit": "Celsius"
+      },
+      "actions": [
+        "Inject temperature input of 29.0 Celsius (1 Celsius below 30.0 Celsius threshold)",
+        "Execute control loop evaluation"
+      ],
+      "expected_outputs": {
+        "FAN_PIN": "LOW",
+        "STATUS_LED_PIN": "LOW"
+      },
+      "expected_behavior": "Fan remains OFF; state is SYSTEM_NORMAL_COOLING",
+      "failure_conditions": [
+        "Actuator prematurely triggered below threshold at 29.0 Celsius"
+      ],
+      "hardware_requirements": {
+        "board": "esp32-devkit-c",
+        "mcu": "ESP32",
+        "architecture": "Xtensa LX6",
+        "required_pins": [
+          "A0",
+          "13",
+          "12"
+        ]
+      },
+      "expected_serial_log": "Normal Range",
+      "metadata": {
+        "boundary_type": "threshold",
+        "position": "below",
+        "threshold": 30.0,
+        "value": 29.0
+      }
+    },
+    {
+      "id": "TC_BOUND_002",
+      "name": "Threshold Boundary Exact: temperature at 30.0 Celsius",
+      "category": "BOUNDARY",
+      "description": "Verify strict boundary condition handling exactly at threshold (30.0 Celsius).",
+      "priority": "CRITICAL",
+      "preconditions": [
+        "System operational in normal monitoring state"
+      ],
+      "inputs": {
+        "temperature": 30.0,
+        "threshold": 30.0,
+        "unit": "Celsius"
+      },
+      "actions": [
+        "Inject temperature input exactly at threshold (30.0 Celsius)",
+        "Execute control loop evaluation"
+      ],
+      "expected_outputs": {
+        "FAN_PIN": "LOW",
+        "STATUS_LED_PIN": "LOW"
+      },
+      "expected_behavior": "Boundary at 30.0 C: <= 30.0 C is OFF, strictly > 30.0 C turns fan ON. Values < -20.0 C or > 120.0 C trigger SYSTEM_SENSOR_FAULT",
+      "failure_conditions": [
+        "Premature boundary trip or oscillation at exactly 30.0 Celsius"
+      ],
+      "hardware_requirements": {
+        "board": "esp32-devkit-c",
+        "mcu": "ESP32",
+        "architecture": "Xtensa LX6",
+        "required_pins": [
+          "A0",
+          "13",
+          "12"
+        ]
+      },
+      "expected_serial_log": "Normal Range",
+      "metadata": {
+        "boundary_type": "threshold",
+        "position": "exact",
+        "threshold": 30.0,
+        "value": 30.0
+      }
+    },
+    {
+      "id": "TC_BOUND_003",
+      "name": "Threshold Boundary Above: temperature at 31.0 Celsius",
+      "category": "BOUNDARY",
+      "description": "Verify activation immediately above decision threshold (30.0 Celsius).",
+      "priority": "HIGH",
+      "preconditions": [
+        "System operational in normal monitoring state"
+      ],
+      "inputs": {
+        "temperature": 31.0,
+        "threshold": 30.0,
+        "unit": "Celsius"
+      },
+      "actions": [
+        "Inject temperature input of 31.0 Celsius (1 Celsius above 30.0 Celsius threshold)",
+        "Execute control loop evaluation"
+      ],
+      "expected_outputs": {
+        "FAN_PIN": "HIGH",
+        "STATUS_LED_PIN": "HIGH"
+      },
+      "expected_behavior": "Fan turns ON; state is SYSTEM_FAN_ACTIVE",
+      "failure_conditions": [
+        "Actuator failed to engage when threshold exceeded at 31.0 Celsius"
+      ],
+      "hardware_requirements": {
+        "board": "esp32-devkit-c",
+        "mcu": "ESP32",
+        "architecture": "Xtensa LX6",
+        "required_pins": [
+          "A0",
+          "13",
+          "12"
+        ]
+      },
+      "expected_serial_log": "Threshold Exceeded",
+      "metadata": {
+        "boundary_type": "threshold",
+        "position": "above",
+        "threshold": 30.0,
+        "value": 31.0
+      }
+    },
+    {
+      "id": "TC_BOUND_004",
+      "name": "Sensor Boundary Min Limit: temperature at -20.0 Celsius",
+      "category": "BOUNDARY",
+      "description": "Verify valid operation at lowest documented sensor boundary (-20.0 Celsius).",
+      "priority": "HIGH",
+      "preconditions": [
+        "System initialized and sensor online"
+      ],
+      "inputs": {
+        "temperature": -20.0,
+        "limit": -20.0,
+        "unit": "Celsius"
+      },
+      "actions": [
+        "Inject sensor reading at minimum operational limit (-20.0 Celsius)",
+        "Execute sensor validation routines"
+      ],
+      "expected_outputs": {
+        "FAN_PIN": "LOW",
+        "STATUS_LED_PIN": "LOW"
+      },
+      "expected_behavior": "Valid sensor reading at boundary -20.0 Celsius; system processes reading without error.",
+      "failure_conditions": [
+        "False sensor fault reported at valid minimum reading -20.0 Celsius"
+      ],
+      "hardware_requirements": {
+        "board": "esp32-devkit-c",
+        "mcu": "ESP32",
+        "architecture": "Xtensa LX6",
+        "required_pins": [
+          "A0",
+          "13",
+          "12"
+        ]
+      },
+      "expected_serial_log": null,
+      "metadata": {
+        "boundary_type": "sensor_limit",
+        "position": "min_limit",
+        "limit_value": -20.0
+      }
+    },
+    {
+      "id": "TC_BOUND_005",
+      "name": "Sensor Boundary Below Min Limit: temperature at -21.0 Celsius",
+      "category": "BOUNDARY",
+      "description": "Verify detection and handling of reading violating minimum sensor boundary (-21.0 Celsius).",
+      "priority": "CRITICAL",
+      "preconditions": [
+        "System operational"
+      ],
+      "inputs": {
+        "temperature": -21.0,
+        "limit": -20.0,
+        "unit": "Celsius"
+      },
+      "actions": [
+        "Inject sensor reading violating lower boundary (-21.0 Celsius < -20.0 Celsius)",
+        "Execute boundary checking routine"
+      ],
+      "expected_outputs": {
+        "FAN_PIN": "LOW",
+        "STATUS_LED_PIN": "LOW"
+      },
+      "expected_behavior": "Reading below -20.0 Celsius is recognized as out-of-range; triggers fault mitigation.",
+      "failure_conditions": [
+        "System accepted out-of-range reading below -20.0 Celsius as valid"
+      ],
+      "hardware_requirements": {
+        "board": "esp32-devkit-c",
+        "mcu": "ESP32",
+        "architecture": "Xtensa LX6",
+        "required_pins": [
+          "A0",
+          "13",
+          "12"
+        ]
+      },
+      "expected_serial_log": "ERROR",
+      "metadata": {
+        "boundary_type": "sensor_limit",
+        "position": "below_min",
+        "limit_value": -20.0,
+        "value": -21.0
+      }
+    },
+    {
+      "id": "TC_BOUND_006",
+      "name": "Sensor Boundary Max Limit: temperature at 120.0 Celsius",
+      "category": "BOUNDARY",
+      "description": "Verify operation at highest documented sensor boundary (120.0 Celsius).",
+      "priority": "HIGH",
+      "preconditions": [
+        "System initialized and sensor online"
+      ],
+      "inputs": {
+        "temperature": 120.0,
+        "limit": 120.0,
+        "unit": "Celsius"
+      },
+      "actions": [
+        "Inject sensor reading at maximum operational limit (120.0 Celsius)",
+        "Execute sensor processing routine"
+      ],
+      "expected_outputs": {
+        "FAN_PIN": "HIGH",
+        "STATUS_LED_PIN": "HIGH"
+      },
+      "expected_behavior": "Valid sensor reading at maximum limit 120.0 Celsius; processed without fault.",
+      "failure_conditions": [
+        "False sensor fault reported at valid maximum reading 120.0 Celsius"
+      ],
+      "hardware_requirements": {
+        "board": "esp32-devkit-c",
+        "mcu": "ESP32",
+        "architecture": "Xtensa LX6",
+        "required_pins": [
+          "A0",
+          "13",
+          "12"
+        ]
+      },
+      "expected_serial_log": null,
+      "metadata": {
+        "boundary_type": "sensor_limit",
+        "position": "max_limit",
+        "limit_value": 120.0
+      }
+    },
+    {
+      "id": "TC_BOUND_007",
+      "name": "Sensor Boundary Above Max Limit: temperature at 121.0 Celsius",
+      "category": "BOUNDARY",
+      "description": "Verify detection and handling of reading violating maximum sensor boundary (121.0 Celsius).",
+      "priority": "CRITICAL",
+      "preconditions": [
+        "System operational"
+      ],
+      "inputs": {
+        "temperature": 121.0,
+        "limit": 120.0,
+        "unit": "Celsius"
+      },
+      "actions": [
+        "Inject sensor reading violating upper boundary (121.0 Celsius > 120.0 Celsius)",
+        "Execute boundary checking routine"
+      ],
+      "expected_outputs": {
+        "FAN_PIN": "LOW",
+        "STATUS_LED_PIN": "LOW"
+      },
+      "expected_behavior": "Reading above 120.0 Celsius is recognized as out-of-range; triggers fault mitigation.",
+      "failure_conditions": [
+        "System accepted out-of-range reading above 120.0 Celsius as valid"
+      ],
+      "hardware_requirements": {
+        "board": "esp32-devkit-c",
+        "mcu": "ESP32",
+        "architecture": "Xtensa LX6",
+        "required_pins": [
+          "A0",
+          "13",
+          "12"
+        ]
+      },
+      "expected_serial_log": "ERROR",
+      "metadata": {
+        "boundary_type": "sensor_limit",
+        "position": "above_max",
+        "limit_value": 120.0,
+        "value": 121.0
+      }
+    },
+    {
+      "id": "TC_ABNORM_001",
+      "name": "Abnormal Extreme Negative Input: temperature at -999.0 Celsius",
+      "category": "ABNORMAL",
+      "description": "Stress-test input sanitizer against severe negative out-of-range temperature reading.",
+      "priority": "MEDIUM",
+      "preconditions": [
+        "System running"
+      ],
+      "inputs": {
+        "temperature": -999.0,
+        "unit": "Celsius"
+      },
+      "actions": [
+        "Inject extreme negative temperature of -999.0 Celsius",
+        "Verify firmware error trap and sanitization"
+      ],
+      "expected_outputs": {
+        "FAN_PIN": "LOW",
+        "STATUS_LED_PIN": "LOW"
+      },
+      "expected_behavior": "System safely rejects extreme negative input and asserts fail-safe state.",
+      "failure_conditions": [
+        "System crashes, overflows, or enters undefined state on extreme negative input"
+      ],
+      "hardware_requirements": {
+        "board": "esp32-devkit-c",
+        "mcu": "ESP32",
+        "architecture": "Xtensa LX6",
+        "required_pins": [
+          "A0",
+          "13",
+          "12"
+        ]
+      },
+      "expected_serial_log": "ERROR",
+      "metadata": {
+        "test_type": "extreme_negative",
+        "value": -999.0
+      }
+    },
+    {
+      "id": "TC_ABNORM_002",
+      "name": "Abnormal Extreme Positive Input: temperature at +999.0 Celsius",
+      "category": "ABNORMAL",
+      "description": "Stress-test input sanitizer against severe positive out-of-range temperature reading.",
+      "priority": "MEDIUM",
+      "preconditions": [
+        "System running"
+      ],
+      "inputs": {
+        "temperature": 999.0,
+        "unit": "Celsius"
+      },
+      "actions": [
+        "Inject extreme positive temperature of 999.0 Celsius",
+        "Verify firmware error trap and sanitization"
+      ],
+      "expected_outputs": {
+        "FAN_PIN": "LOW",
+        "STATUS_LED_PIN": "LOW"
+      },
+      "expected_behavior": "System safely rejects extreme positive input and asserts fail-safe state.",
+      "failure_conditions": [
+        "System crashes, overflows, or enters undefined state on extreme positive input"
+      ],
+      "hardware_requirements": {
+        "board": "esp32-devkit-c",
+        "mcu": "ESP32",
+        "architecture": "Xtensa LX6",
+        "required_pins": [
+          "A0",
+          "13",
+          "12"
+        ]
+      },
+      "expected_serial_log": "ERROR",
+      "metadata": {
+        "test_type": "extreme_positive",
+        "value": 999.0
+      }
+    },
+    {
+      "id": "TC_FAIL_001",
+      "name": "Sensor Disconnection and Hardware Fault Mitigation",
+      "category": "SENSOR_FAILURE",
+      "description": "Simulate physical sensor disconnection / open circuit and verify fail-safe shutdown.",
+      "priority": "CRITICAL",
+      "preconditions": [
+        "System active with cooling or normal monitoring engaged"
+      ],
+      "inputs": {
+        "temperature": -99.0,
+        "sensor_connected": false,
+        "signal_fault": "OPEN_CIRCUIT"
+      },
+      "actions": [
+        "Disconnect physical temperature sensor signal wire (open circuit: -99.0 C reading)",
+        "Invoke sensor processing routine",
+        "Verify immediate transition to safe fault state"
+      ],
+      "expected_outputs": {
+        "FAN_PIN": "LOW",
+        "STATUS_LED_PIN": "LOW"
+      },
+      "expected_behavior": "System detects sensor fault, transitions to 'SYSTEM_SENSOR_FAULT', deactivates actuators to prevent unmonitored operation, and emits serial alert.",
+      "failure_conditions": [
+        "Actuator remains active during sensor disconnection",
+        "System fails to transition to 'SYSTEM_SENSOR_FAULT'",
+        "Error alert not logged over serial"
+      ],
+      "hardware_requirements": {
+        "board": "esp32-devkit-c",
+        "mcu": "ESP32",
+        "architecture": "Xtensa LX6",
+        "required_pins": [
+          "A0",
+          "13",
+          "12"
+        ]
+      },
+      "expected_serial_log": "ERROR: SENSOR_DISCONNECTED",
+      "metadata": {
+        "fault_type": "sensor_fault"
+      }
+    },
+    {
+      "id": "TC_STATE_001",
+      "name": "State Transition: SYSTEM_INIT -> SYSTEM_NORMAL_COOLING",
+      "category": "STATE_TRANSITION",
+      "description": "Validate state transition from 'SYSTEM_INIT' to 'SYSTEM_NORMAL_COOLING' upon 'First valid temperature reading <= 30.0 C'.",
+      "priority": "HIGH",
+      "preconditions": [
+        "System established in source state 'SYSTEM_INIT'"
+      ],
+      "inputs": {
+        "trigger": "First valid temperature reading <= 30.0 C",
+        "temperature": 28.0
+      },
+      "actions": [
+        "Configure system to state 'SYSTEM_INIT'",
+        "Apply transition trigger condition: First valid temperature reading <= 30.0 C",
+        "Inspect state variable and hardware pin outputs"
+      ],
+      "expected_outputs": {
+        "FAN_PIN": "LOW"
+      },
+      "expected_behavior": "System successfully transitions from 'SYSTEM_INIT' to 'SYSTEM_NORMAL_COOLING'. Action executed: set_fan(false).",
+      "failure_conditions": [
+        "System failed to transition to 'SYSTEM_NORMAL_COOLING'",
+        "System transitioned to incorrect state or locked up",
+        "Output pins do not match destination state specifications"
+      ],
+      "hardware_requirements": {
+        "board": "esp32-devkit-c",
+        "mcu": "ESP32",
+        "architecture": "Xtensa LX6",
+        "required_pins": [
+          "A0",
+          "13",
+          "12"
+        ]
+      },
+      "expected_serial_log": null,
+      "metadata": {
+        "from_state": "SYSTEM_INIT",
+        "to_state": "SYSTEM_NORMAL_COOLING",
+        "trigger": "First valid temperature reading <= 30.0 C",
+        "guard": "temp >= -20.0 && temp <= 30.0"
+      }
+    },
+    {
+      "id": "TC_STATE_002",
+      "name": "State Transition: SYSTEM_NORMAL_COOLING -> SYSTEM_FAN_ACTIVE",
+      "category": "STATE_TRANSITION",
+      "description": "Validate state transition from 'SYSTEM_NORMAL_COOLING' to 'SYSTEM_FAN_ACTIVE' upon 'Temperature exceeds threshold'.",
+      "priority": "HIGH",
+      "preconditions": [
+        "System established in source state 'SYSTEM_NORMAL_COOLING'"
+      ],
+      "inputs": {
+        "trigger": "Temperature exceeds threshold",
+        "temperature": 32.5
+      },
+      "actions": [
+        "Configure system to state 'SYSTEM_NORMAL_COOLING'",
+        "Apply transition trigger condition: Temperature exceeds threshold",
+        "Inspect state variable and hardware pin outputs"
+      ],
+      "expected_outputs": {
+        "FAN_PIN": "HIGH"
+      },
+      "expected_behavior": "System successfully transitions from 'SYSTEM_NORMAL_COOLING' to 'SYSTEM_FAN_ACTIVE'. Action executed: set_fan(true).",
+      "failure_conditions": [
+        "System failed to transition to 'SYSTEM_FAN_ACTIVE'",
+        "System transitioned to incorrect state or locked up",
+        "Output pins do not match destination state specifications"
+      ],
+      "hardware_requirements": {
+        "board": "esp32-devkit-c",
+        "mcu": "ESP32",
+        "architecture": "Xtensa LX6",
+        "required_pins": [
+          "A0",
+          "13",
+          "12"
+        ]
+      },
+      "expected_serial_log": null,
+      "metadata": {
+        "from_state": "SYSTEM_NORMAL_COOLING",
+        "to_state": "SYSTEM_FAN_ACTIVE",
+        "trigger": "Temperature exceeds threshold",
+        "guard": "temp > 30.0 && temp <= 120.0"
+      }
+    },
+    {
+      "id": "TC_STATE_003",
+      "name": "State Transition: SYSTEM_FAN_ACTIVE -> SYSTEM_NORMAL_COOLING",
+      "category": "STATE_TRANSITION",
+      "description": "Validate state transition from 'SYSTEM_FAN_ACTIVE' to 'SYSTEM_NORMAL_COOLING' upon 'Temperature cools down to threshold or below'.",
+      "priority": "HIGH",
+      "preconditions": [
+        "System established in source state 'SYSTEM_FAN_ACTIVE'"
+      ],
+      "inputs": {
+        "trigger": "Temperature cools down to threshold or below",
+        "temperature": 28.0
+      },
+      "actions": [
+        "Configure system to state 'SYSTEM_FAN_ACTIVE'",
+        "Apply transition trigger condition: Temperature cools down to threshold or below",
+        "Inspect state variable and hardware pin outputs"
+      ],
+      "expected_outputs": {
+        "FAN_PIN": "LOW"
+      },
+      "expected_behavior": "System successfully transitions from 'SYSTEM_FAN_ACTIVE' to 'SYSTEM_NORMAL_COOLING'. Action executed: set_fan(false).",
+      "failure_conditions": [
+        "System failed to transition to 'SYSTEM_NORMAL_COOLING'",
+        "System transitioned to incorrect state or locked up",
+        "Output pins do not match destination state specifications"
+      ],
+      "hardware_requirements": {
+        "board": "esp32-devkit-c",
+        "mcu": "ESP32",
+        "architecture": "Xtensa LX6",
+        "required_pins": [
+          "A0",
+          "13",
+          "12"
+        ]
+      },
+      "expected_serial_log": null,
+      "metadata": {
+        "from_state": "SYSTEM_FAN_ACTIVE",
+        "to_state": "SYSTEM_NORMAL_COOLING",
+        "trigger": "Temperature cools down to threshold or below",
+        "guard": "temp <= 30.0 && temp >= -20.0"
+      }
+    },
+    {
+      "id": "TC_STATE_004",
+      "name": "State Transition: SYSTEM_NORMAL_COOLING -> SYSTEM_SENSOR_FAULT",
+      "category": "STATE_TRANSITION",
+      "description": "Validate state transition from 'SYSTEM_NORMAL_COOLING' to 'SYSTEM_SENSOR_FAULT' upon 'Invalid sensor reading or disconnection'.",
+      "priority": "HIGH",
+      "preconditions": [
+        "System established in source state 'SYSTEM_NORMAL_COOLING'"
+      ],
+      "inputs": {
+        "trigger": "Invalid sensor reading or disconnection",
+        "temperature": -99.0
+      },
+      "actions": [
+        "Configure system to state 'SYSTEM_NORMAL_COOLING'",
+        "Apply transition trigger condition: Invalid sensor reading or disconnection",
+        "Inspect state variable and hardware pin outputs"
+      ],
+      "expected_outputs": {
+        "FAN_PIN": "LOW"
+      },
+      "expected_behavior": "System successfully transitions from 'SYSTEM_NORMAL_COOLING' to 'SYSTEM_SENSOR_FAULT'. Action executed: set_fan(false).",
+      "failure_conditions": [
+        "System failed to transition to 'SYSTEM_SENSOR_FAULT'",
+        "System transitioned to incorrect state or locked up",
+        "Output pins do not match destination state specifications"
+      ],
+      "hardware_requirements": {
+        "board": "esp32-devkit-c",
+        "mcu": "ESP32",
+        "architecture": "Xtensa LX6",
+        "required_pins": [
+          "A0",
+          "13",
+          "12"
+        ]
+      },
+      "expected_serial_log": null,
+      "metadata": {
+        "from_state": "SYSTEM_NORMAL_COOLING",
+        "to_state": "SYSTEM_SENSOR_FAULT",
+        "trigger": "Invalid sensor reading or disconnection",
+        "guard": "temp < -20.0 || temp > 120.0"
+      }
+    },
+    {
+      "id": "TC_STATE_005",
+      "name": "State Transition: SYSTEM_FAN_ACTIVE -> SYSTEM_SENSOR_FAULT",
+      "category": "STATE_TRANSITION",
+      "description": "Validate state transition from 'SYSTEM_FAN_ACTIVE' to 'SYSTEM_SENSOR_FAULT' upon 'Invalid sensor reading or disconnection'.",
+      "priority": "HIGH",
+      "preconditions": [
+        "System established in source state 'SYSTEM_FAN_ACTIVE'"
+      ],
+      "inputs": {
+        "trigger": "Invalid sensor reading or disconnection",
+        "temperature": -99.0
+      },
+      "actions": [
+        "Configure system to state 'SYSTEM_FAN_ACTIVE'",
+        "Apply transition trigger condition: Invalid sensor reading or disconnection",
+        "Inspect state variable and hardware pin outputs"
+      ],
+      "expected_outputs": {
+        "FAN_PIN": "LOW"
+      },
+      "expected_behavior": "System successfully transitions from 'SYSTEM_FAN_ACTIVE' to 'SYSTEM_SENSOR_FAULT'. Action executed: set_fan(false).",
+      "failure_conditions": [
+        "System failed to transition to 'SYSTEM_SENSOR_FAULT'",
+        "System transitioned to incorrect state or locked up",
+        "Output pins do not match destination state specifications"
+      ],
+      "hardware_requirements": {
+        "board": "esp32-devkit-c",
+        "mcu": "ESP32",
+        "architecture": "Xtensa LX6",
+        "required_pins": [
+          "A0",
+          "13",
+          "12"
+        ]
+      },
+      "expected_serial_log": null,
+      "metadata": {
+        "from_state": "SYSTEM_FAN_ACTIVE",
+        "to_state": "SYSTEM_SENSOR_FAULT",
+        "trigger": "Invalid sensor reading or disconnection",
+        "guard": "temp < -20.0 || temp > 120.0"
+      }
+    },
+    {
+      "id": "TC_UNEXP_001",
+      "name": "Unexpected Input: High-Frequency Jitter Around Threshold (30.0 Celsius)",
+      "category": "UNEXPECTED_INPUT",
+      "description": "Inject rapid alternating readings (29.8 Celsius and 30.2 Celsius) to test debouncing/hysteresis.",
+      "priority": "MEDIUM",
+      "preconditions": [
+        "System in normal operational loop"
+      ],
+      "inputs": {
+        "param": "temperature",
+        "signal": "JITTER",
+        "frequency_hz": 50,
+        "amplitude": 0.4
+      },
+      "actions": [
+        "Inject fluctuating input rapidly crossing 30.0 Celsius threshold at 50Hz",
+        "Monitor output relay line for chatter or race conditions"
+      ],
+      "expected_outputs": {
+        "FAN_PIN": "LOW",
+        "STATUS_LED_PIN": "LOW"
+      },
+      "expected_behavior": "System remains stable without relay chatter or undefined oscillation.",
+      "failure_conditions": [
+        "Relay chatters uncontrollably or controller enters race condition"
+      ],
+      "hardware_requirements": {
+        "board": "esp32-devkit-c",
+        "mcu": "ESP32",
+        "architecture": "Xtensa LX6",
+        "required_pins": [
+          "A0",
+          "13",
+          "12"
+        ]
+      },
+      "expected_serial_log": null,
+      "metadata": {
+        "test_type": "jitter_hysteresis",
+        "threshold": 30.0
+      }
+    },
+    {
+      "id": "TC_COMB_001",
+      "name": "Combination: Cold Boot with Pre-Existing Elevated temperature (35.0 Celsius)",
+      "category": "COMBINATION",
+      "description": "Evaluate initial boot behavior when ambient temperature is already exceeding 30.0 Celsius. Verifies system does not stay stuck in idle if started in hot environment.",
+      "priority": "HIGH",
+      "preconditions": [
+        "Hardware in powered-down cold state",
+        "Ambient temperature established at 35.0 Celsius"
+      ],
+      "inputs": {
+        "power": "ON",
+        "temperature": 35.0
+      },
+      "actions": [
+        "Preset temperature stimulus to 35.0 Celsius",
+        "Apply power / release reset",
+        "Observe state transition from boot to active cooling"
+      ],
+      "expected_outputs": {
+        "FAN_PIN": "HIGH",
+        "STATUS_LED_PIN": "HIGH"
+      },
+      "expected_behavior": "System boots, immediately detects temperature > 30.0, and transitions directly to active cooling.",
+      "failure_conditions": [
+        "System remains in idle state despite elevated startup temperature"
+      ],
+      "hardware_requirements": {
+        "board": "esp32-devkit-c",
+        "mcu": "ESP32",
+        "architecture": "Xtensa LX6",
+        "required_pins": [
+          "A0",
+          "13",
+          "12"
+        ]
+      },
+      "expected_serial_log": "Threshold Exceeded",
+      "metadata": {
+        "combination_type": "boot_at_high_threshold"
+      }
+    },
+    {
+      "id": "TC_COMB_002",
+      "name": "Combination: Sudden Sensor Disconnection During Active Actuator Run",
+      "category": "COMBINATION",
+      "description": "Verify fail-safe shutdown occurs immediately when sensor disconnects while actuator is actively engaged.",
+      "priority": "CRITICAL",
+      "preconditions": [
+        "System running in active state with actuator energized (e.g. at 35.0 C)"
+      ],
+      "inputs": {
+        "initial_temperature": 35.0,
+        "fault_injection": "SENSOR_DISCONNECTED",
+        "fault_reading": -99.0
+      },
+      "actions": [
+        "Establish active cooling state (temperature = 35.0 C, fan = ON)",
+        "Suddenly disconnect sensor wire (-99.0 C reading)",
+        "Verify fan is de-energized within one execution cycle"
+      ],
+      "expected_outputs": {
+        "FAN_PIN": "LOW",
+        "STATUS_LED_PIN": "LOW"
+      },
+      "expected_behavior": "Actuator is immediately de-energized and system transitions to fault state without lingering.",
+      "failure_conditions": [
+        "Actuator remains energized after sensor fault injection"
+      ],
+      "hardware_requirements": {
+        "board": "esp32-devkit-c",
+        "mcu": "ESP32",
+        "architecture": "Xtensa LX6",
+        "required_pins": [
+          "A0",
+          "13",
+          "12"
+        ]
+      },
+      "expected_serial_log": "ERROR: SENSOR_DISCONNECTED",
+      "metadata": {
+        "combination_type": "sensor_fault_under_load"
+      }
+    }
+  ],
+  "total_tests": 20,
+  "categories_count": {
+    "NORMAL": 2,
+    "BOUNDARY": 7,
+    "ABNORMAL": 2,
+    "SENSOR_FAILURE": 1,
+    "STATE_TRANSITION": 5,
+    "UNEXPECTED_INPUT": 1,
+    "COMBINATION": 2
+  }
+}

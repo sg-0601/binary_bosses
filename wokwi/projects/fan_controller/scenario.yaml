@@ -1,0 +1,4 @@
+name: ESP32 Automated Scenario Test
+steps:
+- wait-serial: '[SYSTEM_BOOT]'
+version: 1

@@ -1,0 +1,409 @@
+{
+  "firmware_name": "fan_controller",
+  "target_hardware": {
+    "board": "esp32-devkit-c",
+    "mcu": "ESP32",
+    "architecture": "Xtensa LX6",
+    "operating_voltage": "3.3V",
+    "clock_frequency_mhz": 240.0,
+    "notes": "Standard ESP32 devkit configuration matching Wokwi diagram"
+  },
+  "language": "C",
+  "inputs": [
+    {
+      "name": "temperature_reading",
+      "pin": "A0",
+      "input_type": "analog",
+      "signal_type": "voltage_temperature",
+      "active_level": "CONTINUOUS",
+      "pull_resistor": "none",
+      "description": "Temperature measurement reading in Celsius passed to process_temperature()"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "FAN_PIN",
+      "pin": "13",
+      "output_type": "digital",
+      "default_state": "LOW",
+      "active_level": "HIGH",
+      "safe_state": "LOW",
+      "description": "Controls fan relay power stage (HIGH=ON, LOW=OFF)"
+    },
+    {
+      "name": "STATUS_LED_PIN",
+      "pin": "12",
+      "output_type": "digital",
+      "default_state": "LOW",
+      "active_level": "HIGH",
+      "safe_state": "LOW",
+      "description": "Status indicator LED pin"
+    }
+  ],
+  "sensors": [
+    {
+      "name": "Industrial Temperature Sensor",
+      "sensor_type": "temperature",
+      "interface": "analog_adc",
+      "pin_or_bus": "A0",
+      "unit": "Celsius",
+      "min_operational_value": -20.0,
+      "max_operational_value": 120.0,
+      "sampling_interval_ms": 1000.0,
+      "description": "Measures ambient and equipment temperature across -20.0 C to 120.0 C range"
+    }
+  ],
+  "actuators": [
+    {
+      "name": "Cooling Fan Relay",
+      "actuator_type": "relay",
+      "control_pin": "13",
+      "control_type": "digital",
+      "active_state": "HIGH",
+      "safe_state": "OFF",
+      "description": "Relay driver circuit switching power to industrial cooling fan"
+    }
+  ],
+  "peripherals": [
+    {
+      "name": "GPIO",
+      "peripheral_type": "gpio",
+      "configuration": {
+        "fan_pin": 13,
+        "status_led_pin": 12,
+        "direction": "OUTPUT"
+      },
+      "description": "General Purpose IO driving fan relay and status LED"
+    },
+    {
+      "name": "UART0",
+      "peripheral_type": "uart",
+      "configuration": {
+        "baud_rate": 115200,
+        "data_bits": 8,
+        "parity": "none",
+        "stop_bits": 1
+      },
+      "description": "Serial communication for telemetry, diagnostics, and test logging via printf"
+    }
+  ],
+  "communication_interfaces": [
+    {
+      "interface_type": "UART",
+      "identifier": "UART0",
+      "baud_rate": 115200,
+      "pins": {
+        "TX": "1",
+        "RX": "3"
+      },
+      "protocol_details": "Formatted ASCII serial logging via printf",
+      "description": "Standard output for system boot, state transitions, and alert messages"
+    }
+  ],
+  "important_conditions": [
+    {
+      "condition_id": "COND_HIGH_TEMP_ACTIVE",
+      "description": "Engage cooling fan when temperature exceeds threshold",
+      "trigger": "temp > 30.0",
+      "expected_action": "set_fan(true)",
+      "priority": "high"
+    },
+    {
+      "condition_id": "COND_NORMAL_TEMP_IDLE",
+      "description": "Deactivate cooling fan when temperature is within normal limits",
+      "trigger": "temp <= 30.0 and temp >= -20.0",
+      "expected_action": "set_fan(false)",
+      "priority": "normal"
+    },
+    {
+      "condition_id": "COND_SENSOR_FAULT",
+      "description": "Immediate fault deactivation if sensor reading is out of physical bounds",
+      "trigger": "temp < -20.0 or temp > 120.0",
+      "expected_action": "set_fan(false)",
+      "priority": "critical"
+    }
+  ],
+  "boundary_conditions": [
+    {
+      "parameter": "temperature",
+      "threshold": 30.0,
+      "min_limit": -20.0,
+      "max_limit": 120.0,
+      "unit": "Celsius",
+      "behavior_at_or_below": "Fan remains OFF; state is SYSTEM_NORMAL_COOLING",
+      "behavior_above": "Fan turns ON; state is SYSTEM_FAN_ACTIVE",
+      "edge_case_notes": "Boundary at 30.0 C: <= 30.0 C is OFF, strictly > 30.0 C turns fan ON. Values < -20.0 C or > 120.0 C trigger SYSTEM_SENSOR_FAULT"
+    },
+    {
+      "parameter": "temperature_lower_sensor_limit",
+      "threshold": null,
+      "min_limit": -20.0,
+      "max_limit": null,
+      "unit": "Celsius",
+      "behavior_at_or_below": "Values strictly below -20.0 C trigger SYSTEM_SENSOR_FAULT and turn fan OFF",
+      "behavior_above": "Normal evaluation applies",
+      "edge_case_notes": "Exactly -20.0 C is considered valid minimum normal reading"
+    },
+    {
+      "parameter": "temperature_upper_sensor_limit",
+      "threshold": null,
+      "min_limit": null,
+      "max_limit": 120.0,
+      "unit": "Celsius",
+      "behavior_at_or_below": "Normal evaluation applies",
+      "behavior_above": "Values strictly above 120.0 C trigger SYSTEM_SENSOR_FAULT and turn fan OFF",
+      "edge_case_notes": "Exactly 120.0 C is considered valid maximum normal reading"
+    }
+  ],
+  "error_handling": [
+    {
+      "error_id": "ERR_SENSOR_DISCONNECTED",
+      "fault_type": "sensor_fault",
+      "trigger_condition": "temp < -20.0 || temp > 120.0",
+      "mitigation_action": "set_fan(false) to ensure fail-safe de-energization",
+      "safe_state": "SYSTEM_SENSOR_FAULT",
+      "alert_channel": "UART serial printf alert",
+      "recovery": "Requires valid temperature reading within [-20.0, 120.0] or manual system reset"
+    }
+  ],
+  "states": [
+    {
+      "name": "SYSTEM_INIT",
+      "enum_value": 0,
+      "description": "Initial system boot and hardware configuration state",
+      "is_initial": true,
+      "is_error_state": false,
+      "expected_outputs": {
+        "FAN_PIN": "LOW",
+        "STATUS_LED_PIN": "LOW"
+      }
+    },
+    {
+      "name": "SYSTEM_NORMAL_COOLING",
+      "enum_value": 1,
+      "description": "Operating normally with temperature <= 30.0 C; cooling fan is inactive",
+      "is_initial": false,
+      "is_error_state": false,
+      "expected_outputs": {
+        "FAN_PIN": "LOW"
+      }
+    },
+    {
+      "name": "SYSTEM_FAN_ACTIVE",
+      "enum_value": 2,
+      "description": "Temperature > 30.0 C; cooling fan relay is actively energized",
+      "is_initial": false,
+      "is_error_state": false,
+      "expected_outputs": {
+        "FAN_PIN": "HIGH"
+      }
+    },
+    {
+      "name": "SYSTEM_SENSOR_FAULT",
+      "enum_value": 3,
+      "description": "Sensor fault or disconnection detected; cooling fan forced to safe state (OFF)",
+      "is_initial": false,
+      "is_error_state": true,
+      "expected_outputs": {
+        "FAN_PIN": "LOW"
+      }
+    }
+  ],
+  "state_transitions": [
+    {
+      "from_state": "SYSTEM_INIT",
+      "to_state": "SYSTEM_NORMAL_COOLING",
+      "trigger": "First valid temperature reading <= 30.0 C",
+      "guard_condition": "temp >= -20.0 && temp <= 30.0",
+      "action_on_transition": "set_fan(false)",
+      "description": "Transition from boot state to normal cooling idle"
+    },
+    {
+      "from_state": "SYSTEM_NORMAL_COOLING",
+      "to_state": "SYSTEM_FAN_ACTIVE",
+      "trigger": "Temperature exceeds threshold",
+      "guard_condition": "temp > 30.0 && temp <= 120.0",
+      "action_on_transition": "set_fan(true)",
+      "description": "Fan activates when temperature exceeds 30.0 C"
+    },
+    {
+      "from_state": "SYSTEM_FAN_ACTIVE",
+      "to_state": "SYSTEM_NORMAL_COOLING",
+      "trigger": "Temperature cools down to threshold or below",
+      "guard_condition": "temp <= 30.0 && temp >= -20.0",
+      "action_on_transition": "set_fan(false)",
+      "description": "Fan deactivates when temperature returns to normal range"
+    },
+    {
+      "from_state": "SYSTEM_NORMAL_COOLING",
+      "to_state": "SYSTEM_SENSOR_FAULT",
+      "trigger": "Invalid sensor reading or disconnection",
+      "guard_condition": "temp < -20.0 || temp > 120.0",
+      "action_on_transition": "set_fan(false)",
+      "description": "Fault detected during normal cooling"
+    },
+    {
+      "from_state": "SYSTEM_FAN_ACTIVE",
+      "to_state": "SYSTEM_SENSOR_FAULT",
+      "trigger": "Invalid sensor reading or disconnection",
+      "guard_condition": "temp < -20.0 || temp > 120.0",
+      "action_on_transition": "set_fan(false)",
+      "description": "Fault detected while fan is running"
+    }
+  ],
+  "timing_behavior": {
+    "execution_model": "synchronous",
+    "sampling_interval_ms": 1000.0,
+    "response_time_ms": 10.0,
+    "watchdog_timeout_ms": null,
+    "requirements": [
+      {
+        "name": "temperature_processing_latency",
+        "timing_type": "response_time",
+        "duration_ms": 10.0,
+        "tolerance_ms": 5.0,
+        "description": "Fan relay must update state within 10 ms of receiving new temperature reading"
+      },
+      {
+        "name": "sensor_sample_rate",
+        "timing_type": "periodic",
+        "duration_ms": 1000.0,
+        "tolerance_ms": 100.0,
+        "description": "Periodic temperature sampling interval in production loop"
+      }
+    ],
+    "description": "Synchronous control loop processing sequential temperature events and immediate GPIO actuation"
+  },
+  "assumptions": [
+    {
+      "id": "ASM_01",
+      "category": "hardware",
+      "statement": "GPIO pin 13 is wired to an active-HIGH relay driver circuit controlling the cooling fan.",
+      "impact_if_violated": "Fan would turn ON when disabled and turn OFF when enabled if active-LOW relay is used."
+    },
+    {
+      "id": "ASM_02",
+      "category": "software",
+      "statement": "Temperature sensor driver supplies floating-point Celsius values to process_temperature().",
+      "impact_if_violated": "Fixed-point or raw ADC values would produce incorrect threshold comparison."
+    },
+    {
+      "id": "ASM_03",
+      "category": "environment",
+      "statement": "Physical temperature sensor disconnection causes an out-of-range value such as -99.0 C or open-circuit reading.",
+      "impact_if_violated": "Disconnection may not be detected if ADC floats to a valid in-range reading."
+    }
+  ],
+  "testable_behaviors": [
+    {
+      "id": "TB_01",
+      "name": "System Boot Announcement",
+      "category": "functional",
+      "description": "Verify system initializes and emits boot log and configuration on startup",
+      "preconditions": [
+        "System powered on / reset"
+      ],
+      "stimulus": "main() invocation",
+      "expected_state": "SYSTEM_INIT",
+      "expected_outputs": {},
+      "expected_serial_log": "[SYSTEM_BOOT] Industrial Firmware v1.0.0 initializing...",
+      "verification_criteria": "Serial output contains '[SYSTEM_BOOT]'"
+    },
+    {
+      "id": "TB_02",
+      "name": "Normal Temperature Inactive Fan",
+      "category": "functional",
+      "description": "When temperature is 25.0 C (below 30.0 C threshold), fan remains OFF",
+      "preconditions": [
+        "System initialized"
+      ],
+      "stimulus": "process_temperature(25.0f)",
+      "expected_state": "SYSTEM_NORMAL_COOLING",
+      "expected_outputs": {
+        "FAN_PIN": "LOW"
+      },
+      "expected_serial_log": "Normal Range (<=30.0 C). Fan: OFF",
+      "verification_criteria": "Fan GPIO pin is LOW and log reports Normal Range"
+    },
+    {
+      "id": "TB_03",
+      "name": "High Temperature Fan Activation",
+      "category": "functional",
+      "description": "When temperature reaches 32.5 C (> 30.0 C), fan turns ON",
+      "preconditions": [
+        "System in SYSTEM_NORMAL_COOLING"
+      ],
+      "stimulus": "process_temperature(32.5f)",
+      "expected_state": "SYSTEM_FAN_ACTIVE",
+      "expected_outputs": {
+        "FAN_PIN": "HIGH"
+      },
+      "expected_serial_log": "Threshold Exceeded (>30.0 C). Fan: ON",
+      "verification_criteria": "Fan GPIO pin is set to HIGH (ON) and log reports Threshold Exceeded"
+    },
+    {
+      "id": "TB_04",
+      "name": "Temperature Cooldown Fan Deactivation",
+      "category": "functional",
+      "description": "When temperature drops from 32.5 C to 28.0 C (<= 30.0 C), fan turns OFF",
+      "preconditions": [
+        "System in SYSTEM_FAN_ACTIVE"
+      ],
+      "stimulus": "process_temperature(28.0f)",
+      "expected_state": "SYSTEM_NORMAL_COOLING",
+      "expected_outputs": {
+        "FAN_PIN": "LOW"
+      },
+      "expected_serial_log": "Normal Range (<=30.0 C). Fan: OFF",
+      "verification_criteria": "Fan GPIO pin switches back to LOW and state returns to normal"
+    },
+    {
+      "id": "TB_05",
+      "name": "Sensor Disconnect Fault Handling",
+      "category": "fault_tolerance",
+      "description": "When sensor is disconnected (reading -99.0 C, < -20.0 C), fan forces OFF and transitions to fault state",
+      "preconditions": [
+        "System operational"
+      ],
+      "stimulus": "process_temperature(-99.0f)",
+      "expected_state": "SYSTEM_SENSOR_FAULT",
+      "expected_outputs": {
+        "FAN_PIN": "LOW"
+      },
+      "expected_serial_log": "ERROR: SENSOR_DISCONNECTED or invalid reading (-99.0 C)!",
+      "verification_criteria": "System reports SENSOR_DISCONNECTED, fan is forced OFF, and state transitions to SYSTEM_SENSOR_FAULT"
+    },
+    {
+      "id": "TB_06",
+      "name": "Upper Bound Extreme Fault Handling",
+      "category": "boundary",
+      "description": "When temperature exceeds maximum sensor range (> 120.0 C, e.g. 135.0 C), system enters fault state",
+      "preconditions": [
+        "System operational"
+      ],
+      "stimulus": "process_temperature(135.0f)",
+      "expected_state": "SYSTEM_SENSOR_FAULT",
+      "expected_outputs": {
+        "FAN_PIN": "LOW"
+      },
+      "expected_serial_log": "ERROR: SENSOR_DISCONNECTED or invalid reading",
+      "verification_criteria": "System flags fault state and deactivates fan relay"
+    },
+    {
+      "id": "TB_07",
+      "name": "Exact Boundary 30.0 C Inactive Fan",
+      "category": "boundary",
+      "description": "When temperature is exactly 30.0 C, fan should remain OFF as condition is strictly > 30.0 C",
+      "preconditions": [
+        "System initialized"
+      ],
+      "stimulus": "process_temperature(30.0f)",
+      "expected_state": "SYSTEM_NORMAL_COOLING",
+      "expected_outputs": {
+        "FAN_PIN": "LOW"
+      },
+      "expected_serial_log": "Normal Range (<=30.0 C). Fan: OFF",
+      "verification_criteria": "Boundary condition <= 30.0 C holds true"
+    }
+  ]
+}
